@@ -1,9 +1,9 @@
-package v1.Server;
+package Server;
 
 import java.io.*;
 import java.net.Socket;
 
-import v1.shared.Move;
+import shared.Move;
 
 public class ClientHandler implements Runnable {
     private Socket socket;

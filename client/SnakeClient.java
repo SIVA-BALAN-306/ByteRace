@@ -1,11 +1,11 @@
-package v1.client;
+package client;
 
 import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
 
-import v1.shared.Move;
-import v1.shared.Move.Direction;
+import shared.Move;
+import shared.Move.Direction;
 
 public class SnakeClient {
     public static void main(String[] args) throws Exception{

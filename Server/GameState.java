@@ -1,9 +1,9 @@
-package v1.Server;
+package Server;
 
 import java.util.*;
 
-import v1.shared.Move;
-import v1.shared.Point;
+import shared.Move;
+import shared.Point;
 
 public class GameState {
     public final int WIDTH = 20;

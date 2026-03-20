@@ -1,9 +1,9 @@
-package v1.Server;
+package Server;
 
 import java.net.*;
 import java.util.*;
 
-import v1.shared.Point;
+import shared.Point;
 
 public class SnakeServer {
     public static void main(String[] args) throws Exception{

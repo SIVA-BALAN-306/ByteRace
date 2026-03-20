@@ -7,9 +7,7 @@ public class Move implements Serializable {
     public enum Direction {UP, DOWN, LEFT, RIGHT}
     public Direction direction;
 
-    public Move(Direction direction){
-        this.direction = direction;
+    public Move(Direction d){
+        this.direction = d;
     }
 }
-
-

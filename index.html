@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Royale (Web)</title>
+    <!-- 1. Import Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Use a game-friendly font */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+            color: white;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        canvas {
+            background-color: #1F2937; /* bg-gray-800 */
+            border-radius: 8px;
+            border: 2px solid #374151; /* bg-gray-700 */
+        }
+        /* Custom font for game elements */
+        .font-game {
+            font-family: 'Press Start 2P', cursive;
+        }
+        /* Style for modals */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #374151; /* bg-gray-700 */
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 90%;
+            max-width: 400px;
+        }
+        /* Simple scrollbar for leaderboard */
+        #leaderboard-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        #leaderboard-content::-webkit-scrollbar-track {
+            background: #1F2937; /* bg-gray-800 */
+        }
+        #leaderboard-content::-webkit-scrollbar-thumb {
+            background: #4B5563; /* bg-gray-600 */
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <!-- Main Game UI -->
+    <div id="game-container" class="hidden flex flex-col md:flex-row gap-4 p-4 items-start">
+        <!-- Game Area -->
+        <div class="flex-shrink-0 relative">
+            <canvas id="game-canvas" width="700" height="700"></canvas>
+            <!-- Countdown/Go Text Overlay -->
+            <div id="game-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span id="countdown-text" class="font-game text-white text-9xl" style="text-shadow: 0 0 20px rgba(0,0,0,0.7);"></span>
+            </div>
+            <!-- Waiting Screen -->
+            <div id="waiting-screen" class="absolute inset-0 flex items-center justify-center bg-gray-900/50">
+                <span class="font-game text-white text-2xl animate-pulse">Waiting for host...</span>
+            </div>
+        </div>
+
+        <!-- Right Panel (Leaderboard & Info) -->
+        <div class="flex-grow flex flex-col gap-4 w-full md:w-64">
+            <!-- Leaderboard -->
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="font-game text-lg text-yellow-300 mb-3">Leaderboard</h2>
+                <div id="leaderboard-content" class="max-h-[300px] overflow-y-auto pr-2 space-y-3">
+                    <!-- Leaderboard entries go here -->
+                </div>
+            </div>
+
+            <!-- Game Info -->
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="font-game text-lg text-green-300 mb-3">My Stats</h2>
+                <div class="space-y-2">
+                    <div>
+                        <span class="font-semibold">Score:</span>
+                        <span id="my-score" class="font-game text-lg text-cyan-300 ml-2">0</span>
+                    </div>
+                    <div>
+                        <span class="font-semibold">Boost:</span>
+                        <div class="w-full bg-gray-700 rounded-full h-4 mt-1 overflow-hidden">
+                            <div id="my-boost" class="bg-orange-500 h-4 rounded-full transition-all duration-150" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Info -->
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="font-game text-lg text-purple-300 mb-3">Session</h2>
+                <div>
+                    <label class="text-sm font-semibold">Game ID:</label>
+                    <input id="game-id-display" readonly class="w-full bg-gray-700 p-2 rounded text-sm mt-1" />
+                    <button id="copy-game-id" class="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm mt-2">Copy Game ID</button>
+                </div>
+                <div class="mt-3">
+                    <label class="text-sm font-semibold">My User ID:</label>
+                    <input id="user-id-display" readonly class="w-full bg-gray-700 p-2 rounded text-sm mt-1 break-all" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Modal -->
+    <div id="connection-modal" class="modal flex">
+        <div class="modal-content text-white">
+            <h1 class="font-game text-2xl text-center mb-6">Snake Royale</h1>
+            <div class="space-y-4">
+                <div>
+                    <label for="game-id" class="block text-sm font-medium mb-1">Game ID</label>
+                    <input type="text" id="game-id" class="w-full p-2 rounded bg-gray-800 border border-gray-600" placeholder="Create or Join a Game ID...">
+                </div>
+                <div>
+                    <label for="player-name" class="block text-sm font-medium mb-1">Player Name</label>
+                    <input type="text" id="player-name" class="w-full p-2 rounded bg-gray-800 border border-gray-600" placeholder="Enter your name...">
+                </div>
+                <button id="join-game-btn" class="w-full bg-green-600 hover:bg-green-700 p-3 rounded font-bold">Join Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="modal">
+        <div class="modal-content text-white text-center">
+            <h1 class="font-game text-3xl text-red-500 mb-4">Game Over</h1>
+            <p id="game-over-message" class="text-lg mb-6">You were eliminated!</p>
+            <button id="play-again-btn" class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold">Play Again</button>
+        </div>
+    </div>
+
+    <!-- 2. Import Firebase -->
+    <script type="module">
+        // Firebase imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            query,
+            writeBatch,
+            runTransaction,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Config (Provided by Environment) ---
+        const appId = "1:29455681117:web:29c25459e1e059497cafb4";
+        const firebaseConfig = {
+            apiKey: "AIzaSyBhPDtdcI4qTD1l5dEmyVRhV5bH3XtbWkA",
+            authDomain: "byterace-887ce.firebaseapp.com",
+            projectId: "byterace-887ce",
+            storageBucket: "byterace-887ce.firebasestorage.app",
+            messagingSenderId: "29455681117",
+            appId: "1:29455681117:web:29c25459e1e059497cafb4",
+            measurementId: "G-2BYXXP5HK4"
+        };
+        const initialAuthToken = null;
+
+        let app, auth, db;
+        let myUserId, myPlayerName, gameId;
+        
+        // --- Game Constants ---
+        const CELL_SIZE = 20;
+        const BOARD_TILES = 35; // 35 * 20 = 700px canvas
+        const GAME_TICK_MS = 100; // Base game speed
+        const POWER_UP_MAX = 100;
+        const POWER_UP_INCREMENT_PER_TICK = 1;
+        const POWER_UP_DECREMENT_PER_BOOST_TICK = 3;
+        const FOOD_PER_PLAYER = 3;
+        const HOST_TIMEOUT_MS = 10000; // 10 seconds
+        const AVAILABLE_COLORS = [
+            "#FF3232", "#32FF32", "#3299FF", "#FFFF32", "#FF32FF", "#32FFFF",
+            "#FF9632", "#9632FF", "#AAFF32", "#FFC8C8"
+        ];
+
+        // --- Game State (Local) ---
+        let isHost = false;
+        let localSnakes = {};
+        let localFood = {};
+        let localGameState = {
+            gameRunning: false,
+            countdown: -1,
+            winner: null,
+            hostId: null,
+            hostHeartbeat: null,
+            usedColors: []
+        };
+        let mySnakeState = null; // Quick reference to my own snake
+        let gameLoopInterval = null;
+        let hostHeartbeatInterval = null;
+        let unsubscribes = []; // To clean up listeners
+        
+        // --- DOM Elements ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+        const connectionModal = document.getElementById('connection-modal');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const joinGameBtn = document.getElementById('join-game-btn');
+        const gameIdInput = document.getElementById('game-id');
+        const playerNameInput = document.getElementById('player-name');
+        const countdownText = document.getElementById('countdown-text');
+        const waitingScreen = document.getElementById('waiting-screen');
+        const leaderboardContent = document.getElementById('leaderboard-content');
+        const myScoreEl = document.getElementById('my-score');
+        const myBoostEl = document.getElementById('my-boost');
+        const gameIdDisplay = document.getElementById('game-id-display');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const copyGameIdBtn = document.getElementById('copy-game-id');
+        const gameOverMessage = document.getElementById('game-over-message');
+        const playAgainBtn = document.getElementById('play-again-btn');
+
+        // --- DB Paths ---
+        // FIX: Renamed getGamePath to getGameDocRef for clarity and corrected path logic.
+        // The game document itself holds the game state.
+        const getGameDocRef = () => doc(db, `artifacts/${appId}/public/data/snake-royale/${gameId}`);
+        const getGameStateRef = () => getGameDocRef(); // The game state *is* the game document
+        
+        // FIX: Corrected collection() and doc() calls. 
+        // The first argument should be the DocumentReference (getGameDocRef()), not db.
+        const getSnakesRef = () => collection(getGameDocRef(), 'snakes');
+        const getMySnakeRef = () => doc(getGameDocRef(), 'snakes', myUserId);
+        const getFoodRef = () => collection(getGameDocRef(), 'food');
+
+
+        // === 1. Initialization ===
+
+        async function initFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Set Firestore log level for debugging
+                // setLogLevel('debug');
+
+                return new Promise((resolve, reject) => {
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            myUserId = user.uid;
+                            resolve(user);
+                        }
+                    });
+
+                    if (initialAuthToken) {
+                        signInWithCustomToken(auth, initialAuthToken).catch(reject);
+                    } else {
+                        signInAnonymously(auth).catch(reject);
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase Init Error:", error);
+                alert("Could not initialize game. Check console.");
+                throw error; // Propagate the error to stop joinGameBtn.onclick
+            }
+        }
+
+        joinGameBtn.onclick = async () => {
+            gameId = gameIdInput.value.trim();
+            myPlayerName = playerNameInput.value.trim() || `Player${Math.floor(Math.random() * 100)}`;
+            
+            if (!gameId) {
+                alert("Please enter a Game ID.");
+                return;
+            }
+
+            joinGameBtn.disabled = true;
+            joinGameBtn.textContent = "Joining...";
+
+            try {
+                await initFirebase();
+                userIdDisplay.value = myUserId;
+                gameIdDisplay.value = gameId;
+                await setupHostOrGuest();
+                
+                connectionModal.style.display = 'none';
+                gameContainer.classList.remove('hidden');
+                
+                setupKeyListeners();
+                requestAnimationFrame(renderLoop);
+
+            } catch (error) {
+                console.error("Error joining game:", error);
+                alert("Error joining game: " + error.message);
+                joinGameBtn.disabled = false;
+                joinGameBtn.textContent = "Join Game";
+            }
+        };
+
+        // === 2. Host Election & Game Setup ===
+
+        async function setupHostOrGuest() {
+            const gameStateRef = getGameStateRef();
+            let becameHost = false;
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameStateSnap = await transaction.get(gameStateRef);
+                    
+                    if (!gameStateSnap.exists()) {
+                        // Case 1: Game doesn't exist. Become host.
+                        console.log("No game state. Creating game as host.");
+                        const newGameState = {
+                            gameRunning: false,
+                            countdown: -1,
+                            winner: null,
+                            hostId: myUserId,
+                            hostHeartbeat: serverTimestamp(),
+                            usedColors: []
+                        };
+                        transaction.set(gameStateRef, newGameState);
+                        localGameState = newGameState; // Update local state
+                        becameHost = true;
+                    } else {
+                        // Case 2: Game exists. Check host heartbeat.
+                        const state = gameStateSnap.data();
+                        localGameState = state; // Sync local state
+                        const lastHeartbeat = state.hostHeartbeat?.toMillis() || 0;
+                        
+                        if (Date.now() - lastHeartbeat > HOST_TIMEOUT_MS) {
+                            // Case 3: Host is stale. Take over as host.
+                            console.log("Host is stale. Taking over as host.");
+                            transaction.update(gameStateRef, {
+                                hostId: myUserId,
+                                hostHeartbeat: serverTimestamp()
+                            });
+                            becameHost = true;
+                        } else {
+                            // Case 4: Host is active. Join as guest.
+                            console.log("Host is active. Joining as guest.");
+                            isHost = false;
+                            waitingScreen.style.display = 'flex';
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Host election transaction failed: ", error);
+                throw new Error("Failed to determine game host.");
+            }
+            
+            if (becameHost) {
+                isHost = true;
+                console.log("I am the host.");
+                waitingScreen.style.display = 'none';
+                hostHeartbeatInterval = setInterval(sendHostHeartbeat, HOST_TIMEOUT_MS / 2);
+                // Host game loop starts when players join
+            }
+            
+            // All players: Spawn their snake and set up listeners
+            await spawnMySnake();
+            setupListeners();
+        }
+
+        function sendHostHeartbeat() {
+            if (!isHost) return;
+            updateDoc(getGameStateRef(), { hostHeartbeat: serverTimestamp() }).catch(err => {
+                console.warn("Heartbeat failed:", err.message);
+                // If heartbeat fails (e.g., lost connection), stop being host
+                if (hostHeartbeatInterval) clearInterval(hostHeartbeatInterval);
+                if (gameLoopInterval) clearInterval(gameLoopInterval);
+                isHost = false;
+            });
+        }
+        
+        async function spawnMySnake() {
+            const snakeRef = getMySnakeRef();
+            
+            // Find a color
+            let color = AVAILABLE_COLORS[0];
+            let currentUsedColors = localGameState.usedColors || [];
+            
+            if (currentUsedColors.length > 0) {
+                const available = AVAILABLE_COLORS.filter(c => !currentUsedColors.includes(c));
+                color = available.length > 0 ? available[0] : AVAILABLE_COLORS[Math.floor(Math.random() * AVAILABLE_COLORS.length)];
+            }
+            
+            // Update used colors in transaction to avoid race condition
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameStateSnap = await transaction.get(getGameStateRef());
+                    const state = gameStateSnap.data();
+                    const usedColors = state.usedColors || [];
+                    
+                    if (!usedColors.includes(color)) {
+                         transaction.update(getGameStateRef(), {
+                            usedColors: [...usedColors, color]
+                        });
+                        localGameState.usedColors = [...usedColors, color]; // Update local
+                    }
+                });
+            } catch (e) {
+                console.warn("Color selection transaction failed, using default color.", e);
+            }
+
+
+            // Find a safe spawn point
+            let spawnPoint = { x: 5, y: 5 };
+            let isSafe = false;
+            let attempts = 0;
+            while(!isSafe && attempts < 50) {
+                spawnPoint = {
+                    x: Math.floor(Math.random() * BOARD_TILES),
+                    y: Math.floor(Math.random() * BOARD_TILES)
+                };
+                // Check against local snakes
+                isSafe = !Object.values(localSnakes).some(s => s.body.some(p => p.x === spawnPoint.x && p.y === spawnPoint.y));
+                attempts++;
+            }
+            
+            const newSnake = {
+                name: myPlayerName,
+                color: color,
+                body: [
+                    spawnPoint,
+                    { x: spawnPoint.x - 1, y: spawnPoint.y },
+                    { x: spawnPoint.x - 2, y: spawnPoint.y }
+                ],
+                direction: "RIGHT",
+                score: 3,
+                powerUpMeter: POWER_UP_MAX,
+                isBoosting: false,
+                isAlive: true
+            };
+
+            await setDoc(snakeRef, newSnake);
+            mySnakeState = newSnake; // Set local state immediately
+            console.log("My snake has spawned.");
+        }
+
+        // === 3. Real-time Listeners ===
+
+        function setupListeners() {
+            // Listen for game state changes
+            const unsubGameState = onSnapshot(getGameStateRef(), (docSnap) => {
+                if (!docSnap.exists()) {
+                    // Game document was deleted, likely by host leaving
+                    if (gameLoopInterval) clearInterval(gameLoopInterval);
+                    if (hostHeartbeatInterval) clearInterval(hostHeartbeatInterval);
+                    alert("Game session has ended.");
+                    window.location.reload();
+                    return;
+                }
+                localGameState = docSnap.data();
+                
+                if (isHost && !localGameState.gameRunning && localGameState.countdown === -1) {
+                    // Host checks if it's time to start
+                    if (Object.keys(localSnakes).length >= 2) {
+                        startGameWithCountdown();
+                    }
+                }
+                
+                if (!isHost && localGameState.hostId) {
+                    // Guest watches host
+                    if (localGameState.hostId === myUserId) {
+                        // This should not happen, but as a fallback
+                        console.log("Becoming host due to state update.");
+                        isHost = true;
+                        hostHeartbeatInterval = setInterval(sendHostHeartbeat, HOST_TIMEOUT_MS / 2);
+                    }
+                    // Check if host is stale (e.g., if we missed the transaction)
+                    const lastHeartbeat = localGameState.hostHeartbeat?.toMillis() || 0;
+                    if (Date.now() - lastHeartbeat > HOST_TIMEOUT_MS) {
+                        console.log("Host seems stale, attempting to take over...");
+                        setupHostOrGuest(); // Re-run host election
+                    } else {
+                        waitingScreen.style.display = 'none'; // Host is active, hide waiting
+                    }
+                }
+
+                // Handle Game Over
+                if (localGameState.winner && gameOverModal.style.display !== 'flex') {
+                    gameOverMessage.textContent = localGameState.winner;
+                    gameOverModal.style.display = 'flex';
+                }
+
+                // Update countdown text
+                if (localGameState.countdown > 0) {
+                    countdownText.textContent = localGameState.countdown;
+                    countdownText.style.display = 'block';
+                } else if (localGameState.countdown === 0) {
+                    countdownText.textContent = 'GO!';
+                    // Fade out "GO!"
+                    setTimeout(() => countdownText.style.display = 'none', 1000);
+                } else {
+                    countdownText.style.display = 'none';
+                }
+            });
+
+            // Listen for snake changes
+            const unsubSnakes = onSnapshot(getSnakesRef(), (querySnapshot) => {
+                const newSnakes = {};
+                querySnapshot.forEach((doc) => {
+                    newSnakes[doc.id] = doc.data();
+                });
+                localSnakes = newSnakes;
+                
+                // Update mySnakeState
+                mySnakeState = localSnakes[myUserId] || null;
+                
+                // Check if I died
+                if (mySnakeState && !mySnakeState.isAlive && gameOverModal.style.display !== 'flex') {
+                    gameOverMessage.textContent = "You have been eliminated!";
+                    gameOverModal.style.display = 'flex';
+                }
+
+                updateHUD();
+                updateLeaderboard();
+            });
+
+            // Listen for food changes
+            const unsubFood = onSnapshot(getFoodRef(), (querySnapshot) => {
+                const newFood = {};
+                querySnapshot.forEach((doc) => {
+                    newFood[doc.id] = doc.data();
+                });
+                localFood = newFood;
+            });
+            
+            unsubscribes = [unsubGameState, unsubSnakes, unsubFood];
+        }
+        
+        // === 4. Host Game Loop ===
+
+        async function startGameWithCountdown() {
+            if (!isHost) return;
+            console.log("Starting countdown...");
+            
+            await updateDoc(getGameStateRef(), { countdown: 3 });
+            
+            let count = 3;
+            const countdownInterval = setInterval(async () => {
+                if (!isHost) { // Check if no longer host
+                     clearInterval(countdownInterval);
+                     return;
+                }
+                count--;
+                if (count > 0) {
+                    await updateDoc(getGameStateRef(), { countdown: count });
+                } else if (count === 0) {
+                    await updateDoc(getGameStateRef(), { countdown: 0 });
+                } else {
+                    clearInterval(countdownInterval);
+                    await updateDoc(getGameStateRef(), { gameRunning: true, countdown: -1 });
+                    // Start the main game loop
+                    if (gameLoopInterval) clearInterval(gameLoopInterval);
+                    gameLoopInterval = setInterval(hostGameLoop, GAME_TICK_MS);
+                    console.log("Game has started!");
+                }
+            }, 1000);
+        }
+
+        async function hostGameLoop() {
+            if (!isHost || !localGameState.gameRunning) {
+                if(gameLoopInterval) clearInterval(gameLoopInterval);
+                return;
+            }
+
+            try {
+                const batch = writeBatch(db);
+                let aliveSnakes = Object.entries(localSnakes).filter(([id, s]) => s.isAlive);
+                
+                // --- 1. Update power-ups and move snakes ---
+                const newSnakePositions = {}; // For collision checking
+                
+                for (const [id, snake] of aliveSnakes) {
+                    // Update boost meter
+                    if (snake.isBoosting) {
+                        snake.powerUpMeter = Math.max(0, snake.powerUpMeter - POWER_UP_DECREMENT_PER_BOOST_TICK);
+                        if (snake.powerUpMeter === 0) snake.isBoosting = false;
+                    } else {
+                        snake.powerUpMeter = Math.min(POWER_UP_MAX, snake.powerUpMeter + POWER_UP_INCREMENT_PER_TICK);
+                    }
+
+                    // Move snake (double move for boost)
+                    const moves = snake.isBoosting ? 2 : 1;
+                    for (let i = 0; i < moves; i++) {
+                        const head = { ...snake.body[0] }; // Clone head
+                        switch (snake.direction) {
+                            case "UP":    head.y--; break;
+                            case "DOWN":  head.y++; break;
+                            case "LEFT":  head.x--; break;
+                            case "RIGHT": head.x++; break;
+                        }
+                        snake.body.unshift(head); // Add new head
+                        snake.body.pop(); // Remove tail
+                    }
+                    
+                    // Store new head position for collision check
+                    const headPosKey = `${snake.body[0].x},${snake.body[0].y}`;
+                    if (!newSnakePositions[headPosKey]) {
+                        newSnakePositions[headPosKey] = [];
+                    }
+                    newSnakePositions[headPosKey].push(id);
+                    
+                    // Update snake in local state (for subsequent checks)
+                    localSnakes[id] = snake;
+                }
+
+                // --- 2. Check Collisions ---
+                let snakesToEliminate = new Set();
+                
+                for (const [id, snake] of aliveSnakes) {
+                    const head = snake.body[0];
+
+                    // Wall collision
+                    if (head.x < 0 || head.x >= BOARD_TILES || head.y < 0 || head.y >= BOARD_TILES) {
+                        snakesToEliminate.add(id);
+                        continue;
+                    }
+
+                    // Collision with OTHER snakes' bodies (excluding head)
+                    for (const [otherId, otherSnake] of aliveSnakes) {
+                        // Can't collide with self (original game rule)
+                        if (id === otherId) continue; 
+                        
+                        const otherBody = otherSnake.body.slice(1);
+                        if (otherBody.some(p => p.x === head.x && p.y === head.y)) {
+                            snakesToEliminate.add(id);
+                            break;
+                        }
+                    }
+                }
+                
+                // Check for head-on collisions
+                for (const ids of Object.values(newSnakePositions)) {
+                    if (ids.length > 1) {
+                        ids.forEach(id => snakesToEliminate.add(id));
+                    }
+                }
+
+                // --- 3. Check Food Consumption ---
+                let foodToEat = new Set();
+                for (const [id, snake] of aliveSnakes) {
+                    if (snakesToEliminate.has(id)) continue; // Dead snakes can't eat
+                    
+                    const head = snake.body[0];
+                    for (const [foodId, food] of Object.entries(localFood)) {
+                        if (head.x === food.x && head.y === food.y) {
+                            foodToEat.add(foodId);
+                            snake.score++;
+                            snake.body.push({ ...snake.body[snake.body.length - 1] }); // Grow
+                            break; // Only eat one food per tick
+                        }
+                    }
+                }
+
+                // --- 4. Apply Updates to Batch ---
+                
+                // Update snakes that moved/ate/boosted
+                for (const [id, snake] of aliveSnakes) {
+                    if (snakesToEliminate.has(id)) {
+                        snake.isAlive = false; // Mark as dead
+                    }
+                    // Only write if snake is alive OR was just eliminated
+                    if (snake.isAlive || snakesToEliminate.has(id)) {
+                         batch.update(doc(getSnakesRef(), id), {
+                            body: snake.body,
+                            score: snake.score,
+                            powerUpMeter: snake.powerUpMeter,
+                            isBoosting: snake.isBoosting,
+                            isAlive: snake.isAlive
+                        });
+                    }
+                }
+                
+                // Delete eaten food
+                foodToEat.forEach(foodId => {
+                    if (localFood[foodId]) { // Ensure it exists
+                        batch.delete(doc(getFoodRef(), foodId));
+                    }
+                });
+                
+                // --- 5. Manage Food Spawning ---
+                const foodCount = Object.keys(localFood).length - foodToEat.size;
+                const aliveSnakeCount = aliveSnakes.filter(([id, s]) => !snakesToEliminate.has(id)).length;
+                const desiredFood = aliveSnakeCount * FOOD_PER_PLAYER;
+                
+                if (foodCount < desiredFood) {
+                    const foodToAdd = desiredFood - foodCount;
+                    for (let i = 0; i < foodToAdd; i++) {
+                        let foodPos;
+                        let isSafe = false;
+                        let attempts = 0;
+                        while(!isSafe && attempts < 50) {
+                            foodPos = {
+                                x: Math.floor(Math.random() * BOARD_TILES),
+                                y: Math.floor(Math.random() * BOARD_TILES)
+                            };
+                            // Check against all snakes and other new food
+                            isSafe = !Object.values(localSnakes).some(s => s.isAlive && s.body.some(p => p.x === foodPos.x && p.y === foodPos.y));
+                            attempts++;
+                        }
+                        
+                        if (isSafe) { // Only add if we found a safe spot
+                            const foodColor = AVAILABLE_COLORS[Math.floor(Math.random() * AVAILABLE_COLORS.length)];
+                            const newFoodRef = doc(getFoodRef()); // Auto-generate ID
+                            batch.set(newFoodRef, { ...foodPos, color: foodColor });
+                        }
+                    }
+                }
+
+                // --- 6. Check Win/End Condition ---
+                const remainingAliveSnakes = aliveSnakes.filter(([id, s]) => !snakesToEliminate.has(id));
+                
+                if (remainingAliveSnakes.length <= 1 && aliveSnakes.length > 1) {
+                    // Game over
+                    let winnerMessage = "It's a draw!";
+                    if (remainingAliveSnakes.length === 1) {
+                        winnerMessage = `${remainingAliveSnakes[0][1].name} wins!`;
+                    }
+                    
+                    // Tie-breaker logic from Java server
+                    if (aliveSnakes.length === 2 && snakesToEliminate.size === 2) {
+                        const s1 = aliveSnakes[0][1];
+                        const s2 = aliveSnakes[1][1];
+                        if (s1.score > s2.score) winnerMessage = `${s1.name} won the tie-breaker!`;
+                        else if (s2.score > s1.score) winnerMessage = `${s2.name} won the tie-breaker!`;
+                    }
+                    
+                    console.log("Game over:", winnerMessage);
+                    batch.update(getGameStateRef(), { gameRunning: false, winner: winnerMessage });
+                    clearInterval(gameLoopInterval);
+                    gameLoopInterval = null;
+                }
+
+                // --- 7. Commit Batch ---
+                await batch.commit();
+            } catch (error) {
+                 console.error("Error in host game loop:", error);
+                 if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
+                     console.error("Lost auth, stopping host loop.");
+                     if(gameLoopInterval) clearInterval(gameLoopInterval);
+                     isHost = false;
+                 }
+            }
+        }
+
+        // === 5. Client Input Handling ===
+
+        function setupKeyListeners() {
+            document.addEventListener('keydown', (e) => {
+                if (!mySnakeState || !mySnakeState.isAlive) return;
+
+                let newDir = mySnakeState.direction;
+                switch (e.key) {
+                    case "w": case "ArrowUp":    newDir = "UP"; break;
+                    case "s": case "ArrowDown":  newDir = "DOWN"; break;
+                    case "a": case "ArrowLeft":  newDir = "LEFT"; break;
+                    case "d": case "ArrowRight": newDir = "RIGHT"; break;
+                    case "Shift":
+                        if (!mySnakeState.isBoosting && mySnakeState.powerUpMeter > 10) {
+                            updateDoc(getMySnakeRef(), { isBoosting: true }).catch(console.warn);
+                        }
+                        return; // Don't return on direction keys
+                }
+
+                // Prevent 180-degree turns
+                if (mySnakeState.direction === "UP" && newDir === "DOWN") return;
+                if (mySnakeState.direction === "DOWN" && newDir === "UP") return;
+                if (mySnakeState.direction === "LEFT" && newDir === "RIGHT") return;
+                if (mySnakeState.direction === "RIGHT" && newDir === "LEFT") return;
+
+                if (newDir !== mySnakeState.direction) {
+                    mySnakeState.direction = newDir; // Optimistic update
+                    updateDoc(getMySnakeRef(), { direction: newDir }).catch(console.warn);
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (e.key === "Shift") {
+                    if (mySnakeState && mySnakeState.isBoosting) {
+                        mySnakeState.isBoosting = false; // Optimistic update
+                        updateDoc(getMySnakeRef(), { isBoosting: false }).catch(console.warn);
+                    }
+                }
+            });
+        }
+        
+        // === 6. Rendering Loop ===
+
+        function renderLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1F2937'; // bg-gray-800
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!mySnakeState) {
+                // Still waiting to spawn
+                ctx.fillStyle = "white";
+                ctx.font = "20px 'Press Start 2P'";
+                ctx.textAlign = "center";
+                ctx.fillText("Spawning...", canvas.width / 2, canvas.height / 2);
+                requestAnimationFrame(renderLoop);
+                return;
+            }
+
+            // --- Camera Logic ---
+            const myHead = mySnakeState.body[0];
+            let cameraX = myHead.x * CELL_SIZE - canvas.width / 2 + CELL_SIZE / 2;
+            let cameraY = myHead.y * CELL_SIZE - canvas.height / 2 + CELL_SIZE / 2;
+            
+            // Clamp camera to board boundaries
+            const worldPixelWidth = BOARD_TILES * CELL_SIZE;
+            const worldPixelHeight = BOARD_TILES * CELL_SIZE;
+            cameraX = Math.max(0, Math.min(worldPixelWidth - canvas.width, cameraX));
+            cameraY = Math.max(0, Math.min(worldPixelHeight - canvas.height, cameraY));
+
+            ctx.save();
+            ctx.translate(-cameraX, -cameraY);
+
+            // --- Draw Game Elements ---
+            drawGrid(cameraX, cameraY);
+            drawBoundary();
+            drawFood();
+            drawSnakes();
+
+            ctx.restore();
+            
+            // --- Request Next Frame ---
+            requestAnimationFrame(renderLoop);
+        }
+        
+        function drawGrid(camX, camY) {
+            ctx.strokeStyle = '#374151'; // bg-gray-700
+            ctx.lineWidth = 1;
+            
+            // Optimize grid drawing: only draw visible lines
+            const startX = Math.floor(camX / CELL_SIZE) * CELL_SIZE;
+            const startY = Math.floor(camY / CELL_SIZE) * CELL_SIZE;
+            const endX = camX + canvas.width;
+            const endY = camY + canvas.height;
+
+            for (let x = startX; x <= endX; x += CELL_SIZE) {
+                if(x < 0 || x > BOARD_TILES * CELL_SIZE) continue;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, BOARD_TILES * CELL_SIZE);
+                ctx.stroke();
+            }
+            for (let y = startY; y <= endY; y += CELL_SIZE) {
+                if(y < 0 || y > BOARD_TILES * CELL_SIZE) continue;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(BOARD_TILES * CELL_SIZE, y);
+                ctx.stroke();
+            }
+        }
+        
+        function drawBoundary() {
+            ctx.strokeStyle = '#60A5FA'; // blue-400
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, BOARD_TILES * CELL_SIZE, BOARD_TILES * CELL_SIZE);
+        }
+
+        function drawFood() {
+            for (const food of Object.values(localFood)) {
+                ctx.fillStyle = food.color;
+                ctx.beginPath();
+                ctx.arc(
+                    food.x * CELL_SIZE + CELL_SIZE / 2,
+                    food.y * CELL_SIZE + CELL_SIZE / 2,
+                    CELL_SIZE / 2.5, // Make food slightly smaller
+                    0, 2 * Math.PI
+                );
+                ctx.fill();
+                
+                // "Stem"
+                ctx.fillStyle = "#8B572A";
+                ctx.fillRect(food.x * CELL_SIZE + CELL_SIZE / 2 - 2, food.y * CELL_SIZE, 4, 5);
+            }
+        }
+        
+        function drawSnakes() {
+            for (const [id, snake] of Object.entries(localSnakes)) {
+                if (!snake.isAlive) continue; // Don't draw dead snakes
+                
+                const snakeColor = snake.color;
+                ctx.fillStyle = snakeColor;
+
+                // Draw body
+                for (let i = 1; i < snake.body.length; i++) {
+                    const p = snake.body[i];
+                    ctx.fillRect(p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                }
+                
+                // Draw head
+                const head = snake.body[0];
+                ctx.fillStyle = snakeColor;
+                ctx.fillRect(head.x * CELL_SIZE, head.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                
+                // Draw eyes
+                ctx.fillStyle = "white";
+                let eye1 = { x: 0, y: 0 }, eye2 = { x: 0, y: 0 };
+                const eyeSize = CELL_SIZE / 5;
+                const pupilSize = eyeSize / 2;
+                
+                switch (snake.direction) {
+                    case "UP":
+                        eye1 = { x: head.x * CELL_SIZE + eyeSize, y: head.y * CELL_SIZE + eyeSize };
+                        eye2 = { x: head.x * CELL_SIZE + CELL_SIZE - eyeSize * 2, y: head.y * CELL_SIZE + eyeSize };
+                        break;
+                    case "DOWN":
+                        eye1 = { x: head.x * CELL_SIZE + eyeSize, y: head.y * CELL_SIZE + CELL_SIZE - eyeSize * 2 };
+                        eye2 = { x: head.x * CELL_SIZE + CELL_SIZE - eyeSize * 2, y: head.y * CELL_SIZE + CELL_SIZE - eyeSize * 2 };
+                        break;
+                    case "LEFT":
+                        eye1 = { x: head.x * CELL_SIZE + eyeSize, y: head.y * CELL_SIZE + eyeSize };
+                        eye2 = { x: head.x * CELL_SIZE + eyeSize, y: head.y * CELL_SIZE + CELL_SIZE - eyeSize * 2 };
+                        break;
+                    case "RIGHT":
+                        eye1 = { x: head.x * CELL_SIZE + CELL_SIZE - eyeSize * 2, y: head.y * CELL_SIZE + eyeSize };
+                        eye2 = { x: head.x * CELL_SIZE + CELL_SIZE - eyeSize * 2, y: head.y * CELL_SIZE + CELL_SIZE - eyeSize * 2 };
+                        break;
+                }
+                ctx.beginPath();
+                ctx.arc(eye1.x, eye1.y, eyeSize, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(eye2.x, eye2.y, eyeSize, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Pupils
+                ctx.fillStyle = "black";
+                ctx.beginPath();
+                ctx.arc(eye1.x, eye1.y, pupilSize, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(eye2.x, eye2.y, pupilSize, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+        
+        // === 7. UI Updates & Helpers ===
+
+        function updateHUD() {
+            if (mySnakeState) {
+                myScoreEl.textContent = mySnakeState.score;
+                myBoostEl.style.width = `${mySnakeState.powerUpMeter}%`;
+                myBoostEl.classList.toggle('bg-cyan-500', !mySnakeState.isBoosting);
+                myBoostEl.classList.toggle('bg-orange-500', mySnakeState.isBoosting);
+            } else {
+                // Reset HUD if I'm no longer in the game
+                myScoreEl.textContent = '0';
+                myBoostEl.style.width = '0%';
+            }
+        }
+
+        function updateLeaderboard() {
+            const sortedSnakes = Object.entries(localSnakes)
+                //.filter(([id, s]) => s.isAlive) // Show all snakes, even dead ones, to see final scores
+                .sort(([, a], [, b]) => b.score - a.score);
+
+            leaderboardContent.innerHTML = ''; // Clear
+            if (sortedSnakes.length === 0) {
+                 leaderboardContent.innerHTML = '<p class="text-gray-400">Waiting for players...</p>';
+                 return;
+            }
+
+            sortedSnakes.forEach(([id, snake], index) => {
+                const isMe = (id === myUserId);
+                const bgColor = isMe ? 'bg-blue-900' : 'bg-gray-700';
+                const borderColor = snake.color;
+                const aliveClass = snake.isAlive ? 'text-white' : 'text-gray-500 line-through';
+                
+                const entry = document.createElement('div');
+                entry.className = `p-2 rounded ${bgColor} border-l-4 transition-all`;
+                entry.style.borderColor = borderColor;
+                
+                entry.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-semibold ${aliveClass}">${index + 1}. ${snake.name}</span>
+                        <span class="font-game text-sm ${snake.isAlive ? 'text-yellow-300' : 'text-gray-500'}">${snake.score}</span>
+                    </div>
+                `;
+                leaderboardContent.appendChild(entry);
+            });
+        }
+        
+        copyGameIdBtn.onclick = () => {
+            gameIdDisplay.select();
+            // Use execCommand as a fallback for clipboard API in secure contexts
+            try {
+                document.execCommand('copy');
+                copyGameIdBtn.textContent = 'Copied!';
+                setTimeout(() => copyGameIdBtn.textContent = 'Copy Game ID', 1500);
+            } catch (err) {
+                console.error('Failed to copy Game ID: ', err);
+            }
+        };
+
+        playAgainBtn.onclick = () => {
+            // Reload the entire page. This is the simplest way to disconnect and reconnect.
+            window.location.reload();
+        };
+
+    </script>
+</body>
+</html>
+

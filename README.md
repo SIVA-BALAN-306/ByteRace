@@ -1,6 +1,6 @@
 # ByteRace (Multiplayer Snake Game)
 
-## Version 5
+## Version 6
 
 ByteRace is a multiplayer snake game built in Java. It operates on a robust Client-Server architecture and supports real-time multiplayer gameplay over a custom network protocol.
 

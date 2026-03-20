@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * The client GUI, updated to automatically close on game over.
+ * The client GUI, updated to remove the "Symbol" input field.
  */
 public class SnakeClientGUI extends JFrame {
     private GamePanel gamePanel;
@@ -39,7 +39,6 @@ public class SnakeClientGUI extends JFrame {
         contentPane.add(gamePanel, BorderLayout.CENTER);
         contentPane.add(leaderboardPanel, BorderLayout.EAST);
 
-        // pack() creates a window of the preferred size, it is not maximized by default.
         pack();
         setLocationRelativeTo(null);
         
@@ -87,44 +86,49 @@ public class SnakeClientGUI extends JFrame {
     }
 
     private void connectAndListen() {
-        // A more visually appealing connection dialog
+        // --- Updated Connection Dialog (Symbol Removed) ---
         JPanel panel = new JPanel(new BorderLayout(5, 5));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
         JPanel labels = new JPanel(new GridLayout(0, 1, 2, 2));
-        labels.add(new JLabel("Server IP:", SwingConstants.RIGHT));
+        labels.add(new JLabel("Server IP / Hostname:", SwingConstants.RIGHT));
+        labels.add(new JLabel("Port:", SwingConstants.RIGHT));
         labels.add(new JLabel("Your Name:", SwingConstants.RIGHT));
-        labels.add(new JLabel("Symbol (1 Char):", SwingConstants.RIGHT));
         panel.add(labels, BorderLayout.WEST);
 
         JPanel controls = new JPanel(new GridLayout(0, 1, 2, 2));
         JTextField serverAddressField = new JTextField("localhost", 15);
+        JTextField portField = new JTextField("12345", 15);
         JTextField playerNameField = new JTextField("Player" + (int)(Math.random() * 100), 15);
-        JTextField playerSymbolField = new JTextField("S", 15);
         controls.add(serverAddressField);
+        controls.add(portField);
         controls.add(playerNameField);
-        controls.add(playerSymbolField);
         panel.add(controls, BorderLayout.CENTER);
+        // --- End of Dialog Update ---
 
         int option = JOptionPane.showConfirmDialog(this, panel, "Connect to Server", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (option != JOptionPane.OK_OPTION) { System.exit(0); }
         
         String serverAddress = serverAddressField.getText();
+        String portText = portField.getText();
         String playerName = playerNameField.getText();
-        String playerSymbol = playerSymbolField.getText().trim();
-        if (playerSymbol.length() > 1) playerSymbol = playerSymbol.substring(0, 1);
-        if (playerSymbol.isEmpty()) playerSymbol = "?";
+        if (playerName.isEmpty()) playerName = "Player" + (int)(Math.random() * 100);
         
         try {
-            socket = new Socket(serverAddress, 12345);
+            int port = Integer.parseInt(portText); // Parse the port
+            socket = new Socket(serverAddress, port); // Use the port
+            
             oos = new ObjectOutputStream(socket.getOutputStream());
             ois = new ObjectInputStream(socket.getInputStream());
 
-            sendMessage(new Message(Message.MessageType.JOIN, new String[]{playerName, playerSymbol}));
+            // Send only the player name
+            sendMessage(new Message(Message.MessageType.JOIN, playerName));
             
             setVisible(true);
             new Thread(this::listenToServer).start();
 
+        } catch (NumberFormatException e) {
+            showErrorDialog("Invalid port number: " + portText);
         } catch (UnknownHostException e) {
             showErrorDialog("Server not found: " + e.getMessage());
         } catch (IOException e) {
@@ -167,7 +171,6 @@ public class SnakeClientGUI extends JFrame {
                 gamePanel.setCountdown((int) msg.getPayload());
                 break;
             case GAME_OVER:
-                 // Show the final message, then dispose of the window and exit the application.
                  JOptionPane.showMessageDialog(this, msg.getPayload().toString(), "Game Over", JOptionPane.INFORMATION_MESSAGE);
                  dispose();
                  System.exit(0);
@@ -205,9 +208,7 @@ public class SnakeClientGUI extends JFrame {
     }
 }
 
-/**
- * Custom JPanel to draw the leaderboard.
- */
+// LeaderboardPanel and GamePanel classes remain unchanged...
 class LeaderboardPanel extends JPanel {
     private Message.GameState gameState;
     private int myId = -1;
@@ -276,9 +277,6 @@ class LeaderboardPanel extends JPanel {
     }
 }
 
-/**
- * Custom JPanel to draw the game world with a dynamic size.
- */
 class GamePanel extends JPanel {
     private Message.GameState gameState;
     private int myId = -1;

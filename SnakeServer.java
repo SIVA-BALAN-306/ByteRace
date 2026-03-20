@@ -20,7 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
- * The main server, updated with new collision logic and game-ending conditions.
+ * The main server, updated to remove symbol logic.
  */
 public class SnakeServer {
     private static final int PORT = 12345;
@@ -232,20 +232,18 @@ public class SnakeServer {
         if (!gameRunning) return;
         Map<Integer, String> playerNames = clients.values().stream()
             .filter(c -> c.playerName != null).collect(Collectors.toMap(c -> c.clientId, c -> c.playerName));
-        Map<Integer, String> playerSymbols = clients.values().stream()
-            .filter(c -> c.playerSymbol != null).collect(Collectors.toMap(c -> c.clientId, c -> c.playerSymbol));
 
-        Message.GameState gameState = new Message.GameState(new HashMap<>(snakes), new ArrayList<>(foodItems), playerNames, playerSymbols, currentBoardWidth, currentBoardHeight);
+        // Symbols removed
+        Message.GameState gameState = new Message.GameState(new HashMap<>(snakes), new ArrayList<>(foodItems), playerNames, currentBoardWidth, currentBoardHeight);
         Message message = new Message(Message.MessageType.GAME_STATE, gameState);
         clients.values().forEach(c -> c.sendMessage(message));
     }
 
-    private synchronized void addPlayer(int clientId, String name, String symbol) {
+    private synchronized void addPlayer(int clientId, String name) {
         ClientHandler handler = clients.get(clientId);
         handler.playerName = name;
-        handler.playerSymbol = symbol;
         handler.sendMessage(new Message(Message.MessageType.YOUR_ID, clientId));
-        System.out.println("Player " + name + " (" + symbol + ") with ID " + clientId + " has joined.");
+        System.out.println("Player " + name + " with ID " + clientId + " has joined.");
 
         if (gameRunning) {
             calculateAndSetBoardSize();
@@ -284,8 +282,8 @@ public class SnakeServer {
 
                 System.out.println("Game starting with countdown...");
                 for (int i = 3; i > 0; i--) {
-                    final int count = i;
-                    clients.values().forEach(c -> c.sendMessage(new Message(Message.MessageType.COUNTDOWN, count)));
+                    final int ci = i;
+                    clients.values().forEach(c -> c.sendMessage(new Message(Message.MessageType.COUNTDOWN, ci)));
                     try { Thread.sleep(1000); } catch (InterruptedException e) {}
                 }
                 clients.values().forEach(c -> c.sendMessage(new Message(Message.MessageType.COUNTDOWN, 0)));
@@ -334,7 +332,8 @@ public class SnakeServer {
         private final int clientId;
         private ObjectOutputStream oos;
         private ObjectInputStream ois;
-        public String playerName, playerSymbol;
+        public String playerName;
+        // playerSymbol removed
 
         public ClientHandler(Socket socket, int clientId) { this.socket = socket; this.clientId = clientId; }
 
@@ -345,8 +344,9 @@ public class SnakeServer {
                 ois = new ObjectInputStream(socket.getInputStream());
                 Message msg = (Message) ois.readObject();
                 if (msg.getType() == Message.MessageType.JOIN) {
-                    String[] data = (String[]) msg.getPayload();
-                    addPlayer(clientId, data[0], data[1]);
+                    // Now expects a single String, not String[]
+                    String name = (String) msg.getPayload();
+                    addPlayer(clientId, name);
                 } else return;
                 while (true) {
                     handleMessage((Message) ois.readObject());
